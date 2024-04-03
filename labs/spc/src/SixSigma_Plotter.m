@@ -1,9 +1,11 @@
+
+function[data_set] = SixSigma_Plotter(type)
 import SixSigma.*
 h_data = load('../data/height_data.mat');
 d_data = load('../data/dial_data.mat');
-
 % 1 is height data and 2 is dial data
-data_set = [SixSigma(table2array(h_data.Height_Data), .995, 1.02) SixSigma(table2array(d_data.Dial_data), .995, 1.02)];
+data_set = [SixSigma(table2array(h_data.Height_Data), .995, 1.02, type) SixSigma(table2array(d_data.Dial_data), .995, 1.02, type)];
+data_set = [SixSigma(table2array(h_data.Height_Data), data_set(1).x_LCL - .001, data_set(1).x_UCL + .001, type) SixSigma(table2array(d_data.Dial_data), data_set(2).x_LCL - .001, data_set(2).x_UCL + .001, type)];
 
 names = [ "Height Data" "Dial Data"];
 
@@ -82,3 +84,5 @@ for i=1:2
 
 
 end
+
+end 

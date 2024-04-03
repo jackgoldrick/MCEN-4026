@@ -16,13 +16,14 @@ classdef SixSigma
         r_LCL;
         charts;
         sample_sizes;
+        PopAvg;
 
 
 
     end
 
     methods
-        function obj = SixSigma(input, LSL, USL)
+        function obj = SixSigma(input, LSL, USL, type)
             obj.data = input;
             obj.sizes = length(input(1,:));
             obj.sample_sizes = length(input(:,1));
@@ -31,112 +32,130 @@ classdef SixSigma
             obj = obj.bar_chart(obj);
             obj = obj.set_avgs(obj);
             obj.x_sigma = 0;
-            obj = obj.set_sigma(obj);
-            obj = obj.set_limits(obj);
-            obj = obj.set_Cp(obj, abs(USL- LSL));
-            obj = obj.set_Cpk(obj, LSL, USL);
+            obj = obj.set_sigmas(obj);
+            obj = obj.set_limits(obj, type);
+            obj = obj.set_Cp(obj, abs(USL- LSL), type);
+            obj = obj.set_Cpk(obj, USL, LSL, type);
         end
 
-    end 
+    end
     methods(Static, Access = public)
 
 
         function [out] = get_Xbarbar(obj)
-        
+
             out = obj.x_barbar;
-            
-        end 
+
+        end
 
         function [out] = get_xbarLine(obj)
-        
+
             out = obj.xbar_line;
-            
-        end 
+
+        end
 
         function [out] = get_size(obj)
-        
+
             out = obj.sizes;
-            
-        end 
+
+        end
 
         function [out] = get_rLine(obj)
-        
+
             out = obj.r_line;
-            
+
         end
 
         function [out] = get_rBar(obj)
-        
+
             out = obj.r_bar;
-            
-        end 
+
+        end
 
         function [out] = get_Cp(obj)
-        
+
             out = obj.Cp;
-            
-        end 
+
+        end
 
         function [out] = get_Cpk(obj)
-        
+
             out = obj.Cpk;
-            
-        end 
+
+        end
 
 
     end
 
     methods(Static, Access = private)
 
-        function obj = set_Cp(obj, T)
-            obj.Cp = (2 * T) / (6 * obj.x_sigma);
-
-
-
-
-        end 
-
-
-
-
-        function obj = set_Cpk(obj, USL, LSL)
-            obj.Cpk = min((obj.x_barbar - LSL) / (3 * obj.x_sigma), (USL - obj.x_barbar) / (3 * obj.x_sigma));
-            
-
-
-
-        end 
-
-        function obj = set_limits(obj)
-            obj.x_UCL = obj.x_barbar + 3 *obj.x_sigma;
-            obj.x_LCL = obj.x_barbar - 3 *obj.x_sigma;
-            % obj.x_UCL = obj.x_barbar + 1.023 *obj.r_bar;
-            % obj.x_LCL = obj.x_barbar - 1.023 *obj.r_bar;
-            obj.r_UCL = obj.r_bar * 1.777;
-            obj.r_LCL = obj.r_bar * .223;
-        
-
-        end 
-
-        function obj = set_sigma(obj)
-            for i=1:obj.sizes
-
-                obj.x_sigma = obj.x_sigma + ((transpose(obj.data(:,i) - obj.x_barbar) * (obj.data(:,i) - obj.x_barbar)) );
-            
+        function obj = set_Cp(obj, T, type)
+            if (type == 'r')
+                obj.Cp = (2 * T) / (6 * obj.r_sigma);
+            else
+                obj.Cp = (2 * T) / (6 * obj.x_sigma);
             end
 
-            obj.x_sigma = sqrt((1 / (obj.sample_sizes*obj.sizes - 1)) * obj.x_sigma);
-            obj.r_sigma = obj.r_bar / 3.078;
 
-            
+
+
+        end
+
+
+
+
+        function obj = set_Cpk(obj, USL, LSL, type)
+
+            if (type == 'r')
+                obj.Cpk = min((obj.x_barbar - LSL) / (3 * obj.r_sigma), (USL - obj.x_barbar) / (3 * obj.r_sigma));
+            else
+
+                obj.Cpk = min((obj.x_barbar - LSL) / (3 * obj.x_sigma), (USL - obj.x_barbar) / (3 * obj.x_sigma));
+            end
+
+
+
+
+        end
+
+        function obj = set_limits(obj, type)
+
+            if (type == 'r')
+                obj.x_UCL = obj.x_barbar + 3 *obj.r_sigma;
+                obj.x_LCL = obj.x_barbar - 3 *obj.r_sigma;
+
+                obj.r_UCL = obj.r_bar * 1.777;
+                obj.r_LCL = obj.r_bar * .223;
+            else
+
+                obj.x_UCL = obj.x_barbar + 3 *obj.x_sigma;
+                obj.x_LCL = obj.x_barbar - 3 *obj.x_sigma;
+
+                obj.r_UCL = obj.r_bar * 1.777;
+                obj.r_LCL = obj.r_bar * .223;
+            end
+
+
+        end
+
+        function obj = set_sigmas(obj)
+
+            obj.r_sigma = obj.r_bar / 3.078;
+            obj.x_sigma = sqrt((1 / (obj.sample_sizes*obj.sizes - 1)) * trace(transpose(obj.data - obj.PopAvg) * (obj.data - obj.PopAvg)));
+
+
+
+
+
 
         end
 
         function obj = set_avgs(obj)
-            
+
             V_one = ones(1,obj.sizes);
             obj.x_barbar = ((V_one) * obj.xbar_line) / obj.sizes;
             obj.r_bar = ((V_one) * obj.r_line) / obj.sizes;
+            obj.PopAvg = ones(1, obj.sizes) * (transpose(obj.data) * ones(obj.sample_sizes, 1)) / (obj.sizes * obj.sample_sizes);
 
         end
 
@@ -147,7 +166,7 @@ classdef SixSigma
                     obj.xbar_line(i) = obj.xbar_line(i) + obj.data(j, i);
 
                 end
-                
+
                 obj.xbar_line(i) = obj.xbar_line(i) / obj.sample_sizes;
                 obj.r_line(i) = abs(max(obj.data(:, i)) - min(obj.data(:, i)));
 
@@ -160,3 +179,12 @@ classdef SixSigma
 
 
 end
+% obj.x_UCL = obj.x_barbar + 1.023 *obj.r_bar;
+% obj.x_LCL = obj.x_barbar - 1.023 *obj.r_bar;
+% for i=1:obj.sizes
+%
+%     obj.x_sigma = obj.x_sigma + ((transpose(obj.data(:,i) - obj.PopAvg) * (obj.data(:,i) - obj.PopAvg)));
+%
+% end
+%
+% obj.x_sigma = sqrt((1 / (obj.sample_sizes*obj.sizes - 1)) * obj.x_sigma);
